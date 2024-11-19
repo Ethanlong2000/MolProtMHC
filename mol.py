@@ -1,14 +1,16 @@
-from argparse import Namespace
 import yaml
 import torch
-from fast_transformers.masking import LengthMask as LM
+import time
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from tokenizer.tokenizer import MolTranBertTokenizer
-# from train_pubchem_light import LightningModule
-from rotate_attention_combined import LightningModule
-import time
+from argparse import Namespace
+from fast_transformers.masking import LengthMask as LM
+
+from lightModule import LightningModule,MolTranBertTokenizer
+
+
+
 
 class MolFormer:
     def __init__(self, config_path, ckpt_path, vocab_path, device='cuda'):
@@ -40,7 +42,7 @@ class MolFormer:
             sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
             sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
             embedding = sum_embeddings / sum_mask
-            embeddings.append(embedding.detach().cpu())
+            embeddings.append(embedding.detach())
         return torch.cat(embeddings)
 
     def canonicalize(self, s):
@@ -50,10 +52,10 @@ class MolFormer:
         mol = AllChem.MolFromSequence(peptide_sequence)
         return Chem.MolToSmiles(mol)
 
-# 示例用法
-config_path = '/home/longyh/database/molformer/PretrainedMoLFormer/hparams.yaml'
-ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
-vocab_path = 'bert_vocab.txt'
+
+config_path = './Data/mol/hparams.yaml'
+ckpt_path = './Data/mol/N-Step-Checkpoint_3_30000.ckpt'
+vocab_path = './Data/mol/bert_vocab.txt'
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"CUDA available: {torch.cuda.is_available()}")
@@ -61,13 +63,12 @@ print(f"Selected device: {device}")
 
 molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
 
-df = pd.read_csv('/work/longyh/mhc/testdata.csv')
+# 将处理 CSV 文件的代码移到新的文件中
+import process_csv
 
-# 选取 df 的 sequence 和 mhc_sequence 列拼接成新的列（smiles），并应用 peptide_to_smiles 函数
-df['smiles'] = df['sequence'] + df['mhc_sequence']
-df['smiles'] = df['smiles'].apply(molformer.peptide_to_smiles)
+df = process_csv.process_csv_file('./Data/testdata.csv')
 
-smiles = df.smiles.apply(molformer.canonicalize)
+smiles = df.smiles.apply(process_csv.canonicalize)
 
 start_time = time.time()
 X = molformer.embed(smiles).numpy()
