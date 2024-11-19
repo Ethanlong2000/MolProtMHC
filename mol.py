@@ -54,7 +54,7 @@ class MolFormer:
 
 
 config_path = './Data/mol/hparams.yaml'
-ckpt_path = './Data/mol/N-Step-Checkpoint_3_30000.ckpt'
+ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
 vocab_path = './Data/mol/bert_vocab.txt'
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
