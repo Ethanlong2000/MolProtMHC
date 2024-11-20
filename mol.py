@@ -68,21 +68,14 @@ import process_csv
 
 df = process_csv.process_csv_file('./Data/testdata.csv')
 
-smiles = df.smiles.apply(process_csv.canonicalize)
-
+#调用模型可用下面的代码
+# smiles = df.smiles.apply(process_csv.canonicalize)
+#训练模型时省略处理smiles的步骤
+smiles = df.canonical_smiles
 start_time = time.time()
 X = molformer.embed(smiles).cpu().numpy()
 end_time = time.time()
 input("ENTER...")  # 添加输入提示
 print(f"Embedding time: {end_time - start_time} seconds")
-
-# y = df.Class
-y = df.binding300
-
-print(X.shape, y.shape)
-input("ENTER...")  # 添加输入提示
-print(X)
-input("ENTER...")  # 添加输入提示
-print(y)
 
 
