@@ -71,7 +71,7 @@ df = process_csv.process_csv_file('./Data/testdata.csv')
 smiles = df.smiles.apply(process_csv.canonicalize)
 
 start_time = time.time()
-X = molformer.embed(smiles).numpy()
+X = molformer.embed(smiles).cpu().numpy()
 end_time = time.time()
 input("ENTER...")  # 添加输入提示
 print(f"Embedding time: {end_time - start_time} seconds")
