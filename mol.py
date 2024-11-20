@@ -8,6 +8,7 @@ from argparse import Namespace
 from fast_transformers.masking import LengthMask as LM
 
 from lightModule import LightningModule,MolTranBertTokenizer
+import process_csv
 
 
 
@@ -52,7 +53,7 @@ class MolFormer:
         mol = AllChem.MolFromSequence(peptide_sequence)
         return Chem.MolToSmiles(mol)
 
-
+datapath='./Data/test1k.csv'
 config_path = './Data/mol/hparams.yaml'
 ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
 vocab_path = './Data/mol/bert_vocab.txt'
@@ -63,19 +64,19 @@ print(f"Selected device: {device}")
 
 molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
 
-# 将处理 CSV 文件的代码移到新的文件中
-import process_csv
 
-df = process_csv.process_csv_file('./Data/testdata.csv')
-
-#调用模型可用下面的代码
+#调用模型用下面的代码
+# df = process_csv.process_csv_file(datapath)
 # smiles = df.smiles.apply(process_csv.canonicalize)
-#训练模型时省略处理smiles的步骤
+
+#训练模型时省略处理smiles的步骤(csv文件中已经处理好)
+df=pd.read_csv(datapath)
 smiles = df.canonical_smiles
 start_time = time.time()
 X = molformer.embed(smiles).cpu().numpy()
 end_time = time.time()
 input("ENTER...")  # 添加输入提示
 print(f"Embedding time: {end_time - start_time} seconds")
+print(X.shape)
 
 

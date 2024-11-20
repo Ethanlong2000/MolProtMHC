@@ -18,7 +18,9 @@ def canonicalize(s):
 
 
 if __name__ == "__main__":
-    input_file = "/work/longyh/MolProtMHC/Data/testdata.csv"
+
+    
+    input_file = "/work/longyh/MolProtMHC/Data/test1k.csv"
     
     df = process_csv_file(input_file)
     df['canonical_smiles'] = df['smiles'].apply(canonicalize)
