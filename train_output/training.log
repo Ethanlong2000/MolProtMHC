@@ -2,3 +2,22 @@
 2024-11-21 11:07:59,643 INFO Global seed set to 12345
 2024-11-21 11:22:31,393 INFO Global seed set to 12345
 2024-11-21 11:22:31,947 INFO Global seed set to 12345
+2024-11-21 11:49:50,474 INFO Global seed set to 12345
+2024-11-21 11:49:51,025 INFO Global seed set to 12345
+2024-11-21 11:53:17,975 INFO Global seed set to 12345
+2024-11-21 11:53:18,526 INFO Global seed set to 12345
+2024-11-21 12:01:24,283 INFO Global seed set to 12345
+2024-11-21 12:01:24,834 INFO Global seed set to 12345
+2024-11-21 12:04:27,087 INFO Global seed set to 12345
+2024-11-21 12:04:27,638 INFO Global seed set to 12345
+2024-11-21 12:06:51,331 INFO Global seed set to 12345
+2024-11-21 12:06:51,884 INFO Global seed set to 12345
+2024-11-21 12:07:30,903 ERROR Error during training: not enough values to unpack (expected 3, got 2)
+2024-11-21 12:10:06,075 INFO Global seed set to 12345
+2024-11-21 12:10:06,627 INFO Global seed set to 12345
+2024-11-21 12:10:44,024 ERROR Error during training: Using a target size (torch.Size([32])) that is different to the input size (torch.Size([32, 1])) is deprecated. Please ensure they have the same size.
+2024-11-21 12:13:37,780 INFO Global seed set to 12345
+2024-11-21 12:13:38,332 INFO Global seed set to 12345
+2024-11-21 12:14:17,520 ERROR Error during training: Found dtype Long but expected Float
+2024-11-21 12:16:16,069 INFO Global seed set to 12345
+2024-11-21 12:16:16,621 INFO Global seed set to 12345

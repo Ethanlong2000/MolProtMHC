@@ -32,13 +32,13 @@ class ProteinBertModel:
         encoded_inputs = self.preprocess_sequences(sequences)
         output = self.model(**encoded_inputs)
         last_hidden_state = output['last_hidden_state']
-        return last_hidden_state.cpu().detach().numpy()
+        return last_hidden_state.detach()
     
     def get_pooler_output(self, sequences):
         encoded_inputs = self.preprocess_sequences(sequences)
         output = self.model(**encoded_inputs)
         pooler_output = output['pooler_output']
-        return pooler_output.cpu().detach().numpy()
+        return pooler_output.detach()
     
     def fine_tune(self, train_dataloader, num_epochs=3, learning_rate=1e-5):
         self.model.train()

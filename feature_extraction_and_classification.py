@@ -13,16 +13,15 @@ from mol import MolFormer
 
 # 自定义数据集类
 class CustomDataset(Dataset):
-    def __init__(self, protein_sequences, smiles, labels):
-        self.protein_sequences = protein_sequences
-        self.smiles = smiles
+    def __init__(self, features, labels):
+        self.features = features
         self.labels = labels
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        return self.protein_sequences[idx], self.smiles[idx], self.labels[idx]
+        return self.features[idx], self.labels[idx]
 
 # 多层感知机分类器
 class MLPClassifier(nn.Module):
@@ -48,10 +47,11 @@ def train_model(model, dataloader, criterion, optimizer, device, num_epochs=10, 
 
     for epoch in range(num_epochs):
         epoch_loss = 0.0
-        for protein_seq, smiles, labels in dataloader:
-            protein_seq, smiles, labels = protein_seq.to(device), smiles.to(device), labels.to(device)
+        for features, labels in dataloader:
+            features, labels = features.to(device), labels.to(device).float()  # 转换标签为浮点数
+            labels = labels.view(-1, 1)  # 调整标签形状
             optimizer.zero_grad()
-            outputs = model(protein_seq, smiles)
+            outputs = model(features)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -104,14 +104,14 @@ def load_model(model, path):
     model.load_state_dict(torch.load(path))
 
 # 提取特征
-def extract_features(protein_model, mol_model, protein_sequences, smiles, batch_size):
+def extract_features(protein_model, mol_model, protein_sequences, smiles, batch_size, device):
     protein_features = []
     mol_features = []
     for i in range(0, len(protein_sequences), batch_size):
         batch_protein_sequences = protein_sequences[i:i+batch_size]
         batch_smiles = smiles[i:i+batch_size]
-        protein_features.append(protein_model.get_pooler_output(batch_protein_sequences))
-        mol_features.append(mol_model.embed(batch_smiles))
+        protein_features.append(protein_model.get_pooler_output(batch_protein_sequences).to(device))
+        mol_features.append(mol_model.embed(batch_smiles).to(device))
     protein_features = torch.cat(protein_features, dim=0)
     mol_features = torch.cat(mol_features, dim=0)
     return torch.cat((protein_features, mol_features), dim=1)
@@ -138,14 +138,14 @@ def main(config):
                                                         config['smiles_col'], 
                                                         config['label_col'])
 
-    features = extract_features(protein_model, mol_model, protein_sequences, smiles, config['batch_size'])
+    features = extract_features(protein_model, mol_model, protein_sequences, smiles, config['batch_size'], device)
 
-    dataset = CustomDataset(features, labels)
+    dataset = CustomDataset(features, torch.tensor(labels).to(device))
     dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
 
     classifier = MLPClassifier(config['input_dim'], config['hidden_dim'], config['output_dim']).to(device)
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(classifier.parameters(), lr=config['learning_rate'])
+    optimizer = optim.Adam(classifier.parameters(), lr=float(config['learning_rate']))
 
     try:
         train_model(classifier, dataloader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 5))
