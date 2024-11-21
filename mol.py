@@ -22,7 +22,7 @@ class MolFormer:
         self.lm.to(self.device)
         print(f"Using device: {self.device}")
 
-    def batch_split(self, data, batch_size=64):
+    def batch_split(self, data, batch_size=128):
         i = 0
         while i < len(data):
             yield data[i:min(i+batch_size, len(data))]

@@ -26,3 +26,7 @@
 2024-11-21 13:10:48,870 ERROR Error in data preprocessing: [Errno 2] No such file or directory: '/work/longyh/mhc/test12k.csv '
 2024-11-21 13:12:08,191 INFO Global seed set to 12345
 2024-11-21 13:12:08,744 INFO Global seed set to 12345
+2024-11-21 13:34:52,376 INFO Global seed set to 12345
+2024-11-21 13:34:52,929 INFO Global seed set to 12345
+2024-11-21 15:10:34,679 INFO Global seed set to 12345
+2024-11-21 15:10:35,231 INFO Global seed set to 12345

@@ -23,7 +23,7 @@ def canonicalize(s):
 
 if __name__ == "__main__":
     
-    input_file = "/work/longyh/MolProtMHC/Data/test12k.csv"
+    input_file = "/work/longyh/mhc/test125k.csv"
     
     df = process_csv_file(input_file)
     
