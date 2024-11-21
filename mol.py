@@ -11,8 +11,6 @@ from lightModule import LightningModule,MolTranBertTokenizer
 import process_csv
 
 
-
-
 class MolFormer:
     def __init__(self, config_path, ckpt_path, vocab_path, device='cuda'):
         with open(config_path, 'r') as f:
@@ -70,13 +68,14 @@ molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
 # smiles = df.smiles.apply(process_csv.canonicalize)
 
 #训练模型时省略处理smiles的步骤(csv文件中已经处理好)
-df=pd.read_csv(datapath)
-smiles = df.canonical_smiles
-start_time = time.time()
-X = molformer.embed(smiles).cpu().numpy()
-end_time = time.time()
-input("ENTER...")  # 添加输入提示
-print(f"Embedding time: {end_time - start_time} seconds")
-print(X.shape)
+# df=pd.read_csv(datapath)
+# smiles = df.canonical_smiles
+
+# start_time = time.time()
+# X = molformer.embed(smiles).cpu().numpy()
+# end_time = time.time()
+# input("ENTER...")  # 添加输入提示
+# print(f"Embedding time: {end_time - start_time} seconds")
+# print(X.shape)
 
 

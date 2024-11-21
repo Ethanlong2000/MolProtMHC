@@ -19,6 +19,7 @@ from transformers import BertTokenizer
 import regex as re
 
 PATTERN = "(\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\(|\)|\.|=|#|-|\+|\\\\|\/|:|~|@|\?|>|\*|\$|\%[0-9]{2}|[0-9])"
+
 class MolTranBertTokenizer(BertTokenizer):
     def __init__(self, vocab_file: str = '',
                  do_lower_case=False,
@@ -85,7 +86,7 @@ class RotateAttentionLayer(AttentionLayer):
                  d_values=d_values, event_dispatcher=event_dispatcher)
 
         self.rotaryemb = RotaryEmbedding(d_keys)
-        print('Using Rotation Embedding')
+        # print('Using Rotation Embedding')
 
     def forward(self, queries, keys, values, attn_mask, query_lengths,
                 key_lengths):

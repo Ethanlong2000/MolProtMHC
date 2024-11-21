@@ -14,15 +14,29 @@ class ProteinBertModel:
         encoded_input = self.tokenizer(sequence, return_tensors='pt').to(self.device)
         return encoded_input
     
-    def get_last_hidden_state(self, sequence):
-        encoded_input = self.preprocess_sequence(sequence)
-        output = self.model(**encoded_input)
+    def preprocess_sequences(self, sequences, batch_size=32):
+        all_input_ids = []
+        all_attention_masks = []
+        
+        for i in range(0, len(sequences), batch_size):
+            batch_sequences = sequences[i:i + batch_size]
+            encoded_inputs = self.tokenizer(batch_sequences, return_tensors='pt', padding=True, truncation=True).to(self.device)
+            all_input_ids.append(encoded_inputs['input_ids'])
+            all_attention_masks.append(encoded_inputs['attention_mask'])
+        
+        input_ids = torch.cat(all_input_ids, dim=0)
+        attention_mask = torch.cat(all_attention_masks, dim=0)
+        return {'input_ids': input_ids, 'attention_mask': attention_mask}
+
+    def get_last_hidden_state(self, sequences):
+        encoded_inputs = self.preprocess_sequences(sequences)
+        output = self.model(**encoded_inputs)
         last_hidden_state = output['last_hidden_state']
         return last_hidden_state.cpu().detach().numpy()
     
-    def get_pooler_output(self, sequence):
-        encoded_input = self.preprocess_sequence(sequence)
-        output = self.model(**encoded_input)
+    def get_pooler_output(self, sequences):
+        encoded_inputs = self.preprocess_sequences(sequences)
+        output = self.model(**encoded_inputs)
         pooler_output = output['pooler_output']
         return pooler_output.cpu().detach().numpy()
     
@@ -57,17 +71,16 @@ class ProteinBertModel:
 # 示例用法
 if __name__ == "__main__": 
     model_path = "/home/longyh/software/prot_bert/"
-    csv_file = "path/to/your/csvfile.csv"
-    column_name = "sequence_column"
+    csv_file = "/work/longyh/MolProtMHC/Data/test1k.csv"
+    column_name = "combine"
     
     protein_bert_model = ProteinBertModel(model_path)
     sequences = protein_bert_model.process_csv(csv_file, column_name)
     
-    for sequence in sequences:
-        last_hidden_state = protein_bert_model.get_last_hidden_state(sequence)
-        pooler_output = protein_bert_model.get_pooler_output(sequence)
-        
-        print("Last Hidden State Shape:", last_hidden_state.shape)
-        print("Last Hidden State:", last_hidden_state)
-        print("Pooler Output Shape:", pooler_output.shape)
-        print("Pooler Output:", pooler_output)
+    last_hidden_states = protein_bert_model.get_last_hidden_state(sequences)
+    pooler_outputs = protein_bert_model.get_pooler_output(sequences)
+    
+    print("Last Hidden States Shape:", last_hidden_states.shape)
+    print("Last Hidden States:", last_hidden_states)
+    print("Pooler Outputs Shape:", pooler_outputs.shape)
+    print("Pooler Outputs:", pooler_outputs)
