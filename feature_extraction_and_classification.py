@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.optim.lr_scheduler import StepLR  # 添加学习率调度器
 from sklearn.model_selection import train_test_split  # 添加数据集划分模块
 from torch.optim.lr_scheduler import ReduceLROnPlateau  # 添加学习率调度器
+import matplotlib.pyplot as plt  # 添加绘图模块
 
 from prot import ProteinBertModel
 from mol import MolFormer
@@ -53,6 +54,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
     model.train()
     best_loss = float('inf')
     patience_counter = 0
+    train_losses = []
+    val_losses = []
 
     for epoch in range(num_epochs):
         start_time = time.time()  # 记录开始时间
@@ -69,6 +72,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
             epoch_loss += loss.item()
 
         epoch_loss /= len(train_loader)
+        train_losses.append(epoch_loss)
         end_time = time.time()  # 记录结束时间
         epoch_duration = end_time - start_time  # 计算训练时间
 
@@ -83,6 +87,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
         val_loss /= len(val_loader)
+        val_losses.append(val_loss)
 
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}, Val Loss: {val_loss}, Duration: {epoch_duration:.2f} seconds")
 
@@ -98,6 +103,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         if patience_counter >= patience:
             print("Early stopping triggered")
             break
+
+    return train_losses, val_losses
 
 # 加载配置文件
 def load_config(config_path):
@@ -191,11 +198,22 @@ def main(config):
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)  # 使用 ReduceLROnPlateau 调度器
 
     try:
-        train_model(classifier, train_loader, val_loader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 5), scheduler=scheduler)
+        train_losses, val_losses = train_model(classifier, train_loader, val_loader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 5), scheduler=scheduler)
         save_model(classifier, config['model_save_path'])
     except Exception as e:
         logging.error(f"Error during training: {e}")
         raise
+
+    # 绘制损失曲线
+    plt.figure()
+    plt.plot(train_losses, label='Train Loss')
+    plt.plot(val_losses, label='Val Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Training and Validation Loss')
+    plt.savefig(os.path.join(os.path.dirname(config['model_save_path']), 'loss_curve.png'))
+    plt.show()
 
     end_time = time.time()  # 记录脚本结束时间
     total_duration = end_time - start_time  # 计算总时间花费
