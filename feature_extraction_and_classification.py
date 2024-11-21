@@ -34,16 +34,20 @@ class MLPClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim1, hidden_dim2, output_dim):
         super(MLPClassifier, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim1)
+        self.bn1 = nn.BatchNorm1d(hidden_dim1)  # 添加批归一化层
         self.relu1 = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim1, hidden_dim2)
+        self.bn2 = nn.BatchNorm1d(hidden_dim2)  # 添加批归一化层
         self.relu2 = nn.ReLU()
         self.fc3 = nn.Linear(hidden_dim2, output_dim)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.fc1(x)
+        x = self.bn1(x)  # 批归一化
         x = self.relu1(x)
         x = self.fc2(x)
+        x = self.bn2(x)  # 批归一化
         x = self.relu2(x)
         x = self.fc3(x)
         x = self.sigmoid(x)
@@ -205,6 +209,7 @@ def main(config):
         raise
 
     # 绘制损失曲线
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # 获取当前时间戳
     plt.figure()
     plt.plot(train_losses, label='Train Loss')
     plt.plot(val_losses, label='Val Loss')
@@ -212,8 +217,9 @@ def main(config):
     plt.ylabel('Loss')
     plt.legend()
     plt.title('Training and Validation Loss')
-    plt.savefig(os.path.join(os.path.dirname(config['model_save_path']), 'loss_curve.png'))
-    plt.show()
+    loss_curve_path = os.path.join(os.path.dirname(config['model_save_path']), f'loss_curve_{timestamp}.png')
+    plt.savefig(loss_curve_path)
+    # plt.show()
 
     end_time = time.time()  # 记录脚本结束时间
     total_duration = end_time - start_time  # 计算总时间花费

@@ -14,7 +14,7 @@ class ProteinBertModel:
         encoded_input = self.tokenizer(sequence, return_tensors='pt').to(self.device)
         return encoded_input
     
-    def preprocess_sequences(self, sequences, batch_size=128):
+    def preprocess_sequences(self, sequences, batch_size=64):
         all_input_ids = []
         all_attention_masks = []
         

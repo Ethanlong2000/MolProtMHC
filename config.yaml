@@ -6,7 +6,7 @@ csv_file: "/work/longyh/mhc/test125k.csv"
 protein_col: "combine"
 smiles_col: "canonical_smiles"
 label_col: "binding300"
-batch_size: 64
+batch_size: 128
 input_dim: 1792
 hidden_dim: 512
 hidden_dim1: 512
