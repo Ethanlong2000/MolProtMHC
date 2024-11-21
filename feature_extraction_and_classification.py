@@ -10,6 +10,8 @@ import time  # 添加计时模块
 from datetime import datetime  # 添加日期时间模块
 from torch.utils.data import DataLoader, Dataset
 from torch.optim.lr_scheduler import StepLR  # 添加学习率调度器
+from sklearn.model_selection import train_test_split  # 添加数据集划分模块
+from torch.optim.lr_scheduler import ReduceLROnPlateau  # 添加学习率调度器
 
 from prot import ProteinBertModel
 from mol import MolFormer
@@ -47,7 +49,7 @@ class MLPClassifier(nn.Module):
         return x
 
 # 训练模型函数
-def train_model(model, dataloader, criterion, optimizer, device, num_epochs=10, patience=5, scheduler=None):
+def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs=10, patience=5, scheduler=None):
     model.train()
     best_loss = float('inf')
     patience_counter = 0
@@ -55,7 +57,8 @@ def train_model(model, dataloader, criterion, optimizer, device, num_epochs=10, 
     for epoch in range(num_epochs):
         start_time = time.time()  # 记录开始时间
         epoch_loss = 0.0
-        for features, labels in dataloader:
+        model.train()
+        for features, labels in train_loader:
             features, labels = features.to(device), labels.to(device).float()  # 转换标签为浮点数
             labels = labels.view(-1, 1)  # 调整标签形状
             optimizer.zero_grad()
@@ -65,16 +68,29 @@ def train_model(model, dataloader, criterion, optimizer, device, num_epochs=10, 
             optimizer.step()
             epoch_loss += loss.item()
 
-        epoch_loss /= len(dataloader)
+        epoch_loss /= len(train_loader)
         end_time = time.time()  # 记录结束时间
         epoch_duration = end_time - start_time  # 计算训练时间
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}, Duration: {epoch_duration:.2f} seconds")
+
+        # 验证模型
+        val_loss = 0.0
+        model.eval()
+        with torch.no_grad():
+            for features, labels in val_loader:
+                features, labels = features.to(device), labels.to(device).float()
+                labels = labels.view(-1, 1)
+                outputs = model(features)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item()
+        val_loss /= len(val_loader)
+
+        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}, Val Loss: {val_loss}, Duration: {epoch_duration:.2f} seconds")
 
         if scheduler:
-            scheduler.step()  # 更新学习率
+            scheduler.step(val_loss)  # 根据验证损失更新学习率
 
-        if epoch_loss < best_loss:
-            best_loss = epoch_loss
+        if val_loss < best_loss:
+            best_loss = val_loss
             patience_counter = 0
         else:
             patience_counter += 1
@@ -155,18 +171,27 @@ def main(config):
                                                         config['smiles_col'], 
                                                         config['label_col'])
 
+    feature_start_time = time.time()  # 记录特征提取开始时间
     features = extract_features(protein_model, mol_model, protein_sequences, smiles, config['batch_size'], device)
+    feature_end_time = time.time()  # 记录特征提取结束时间
+    feature_duration = feature_end_time - feature_start_time  # 计算特征提取时间
+    print(f"Feature extraction duration: {feature_duration:.2f} seconds")
 
-    dataset = CustomDataset(features, torch.tensor(labels).to(device))
-    dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
+    train_features, val_features, train_labels, val_labels = train_test_split(features, labels, test_size=0.2, random_state=42)
+
+    train_dataset = CustomDataset(train_features, torch.tensor(train_labels).to(device))
+    val_dataset = CustomDataset(val_features, torch.tensor(val_labels).to(device))
+
+    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False)
 
     classifier = MLPClassifier(config['input_dim'], config['hidden_dim1'], config['hidden_dim2'], config['output_dim']).to(device)
     criterion = nn.BCELoss()
     optimizer = optim.Adam(classifier.parameters(), lr=float(config['learning_rate']))
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  # 每10个epoch将学习率降低为原来的0.1倍
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)  # 使用 ReduceLROnPlateau 调度器
 
     try:
-        train_model(classifier, dataloader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 5), scheduler=scheduler)
+        train_model(classifier, train_loader, val_loader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 5), scheduler=scheduler)
         save_model(classifier, config['model_save_path'])
     except Exception as e:
         logging.error(f"Error during training: {e}")
