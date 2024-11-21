@@ -9,10 +9,10 @@ import os
 import time  # 添加计时模块
 from datetime import datetime  # 添加日期时间模块
 from torch.utils.data import DataLoader, Dataset
-from torch.optim.lr_scheduler import StepLR  # 添加学习率调度器
 from sklearn.model_selection import train_test_split  # 添加数据集划分模块
 from torch.optim.lr_scheduler import ReduceLROnPlateau  # 添加学习率调度器
 import matplotlib.pyplot as plt  # 添加绘图模块
+import pickle  # 添加pickle模块
 
 from prot import ProteinBertModel
 from mol import MolFormer
@@ -158,6 +158,18 @@ def extract_features(protein_model, mol_model, protein_sequences, smiles, batch_
     mol_features = torch.cat(mol_features, dim=0)
     return torch.cat((protein_features, mol_features), dim=1)
 
+# 保存特征
+def save_features(features, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'wb') as f:
+        pickle.dump(features, f)
+
+# 加载特征
+def load_features(path):
+    with open(path, 'rb') as f:
+        features = pickle.load(f)
+    return features
+
 # 冻结模型参数
 def freeze_model_parameters(model):
     for param in model.parameters():
@@ -182,11 +194,18 @@ def main(config):
                                                         config['smiles_col'], 
                                                         config['label_col'])
 
-    feature_start_time = time.time()  # 记录特征提取开始时间
-    features = extract_features(protein_model, mol_model, protein_sequences, smiles, config['batch_size'], device)
-    feature_end_time = time.time()  # 记录特征提取结束时间
-    feature_duration = feature_end_time - feature_start_time  # 计算特征提取时间
-    print(f"Feature extraction duration: {feature_duration:.2f} seconds")
+    feature_path = config.get('feature_save_path', 'features.pkl')
+    if os.path.exists(feature_path):
+        features = load_features(feature_path)
+        print(f"Loaded features from {feature_path}")
+    else:
+        feature_start_time = time.time()  # 记录特征提取开始时间
+        features = extract_features(protein_model, mol_model, protein_sequences, smiles, config['batch_size'], device)
+        feature_end_time = time.time()  # 记录特征提取结束时间
+        feature_duration = feature_end_time - feature_start_time  # 计算特征提取时间
+        print(f"Feature extraction duration: {feature_duration:.2f} seconds")
+        save_features(features, feature_path)
+        print(f"Saved features to {feature_path}")
 
     train_features, val_features, train_labels, val_labels = train_test_split(features, labels, test_size=0.2, random_state=42)
 
