@@ -51,6 +51,9 @@ class MolFormer:
         mol = AllChem.MolFromSequence(peptide_sequence)
         return Chem.MolToSmiles(mol)
 
+    def parameters(self):
+        return self.lm.parameters()
+
 datapath='./Data/test1k.csv'
 config_path = './Data/mol/hparams.yaml'
 ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
@@ -74,7 +77,7 @@ molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
 # start_time = time.time()
 # X = molformer.embed(smiles).cpu().numpy()
 # end_time = time.time()
-# input("ENTER...")  # 添加输入提示
+# input("ENTER...")  # ���加输入提示
 # print(f"Embedding time: {end_time - start_time} seconds")
 # print(X.shape)
 

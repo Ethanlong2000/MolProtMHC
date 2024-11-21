@@ -111,7 +111,7 @@ def extract_features(protein_model, mol_model, protein_sequences, smiles, batch_
         batch_protein_sequences = protein_sequences[i:i+batch_size]
         batch_smiles = smiles[i:i+batch_size]
         protein_features.append(protein_model.get_pooler_output(batch_protein_sequences))
-        mol_features.append(mol_model.embed(batch_smiles).cpu().numpy())
+        mol_features.append(mol_model.embed(batch_smiles))
     protein_features = torch.cat(protein_features, dim=0)
     mol_features = torch.cat(mol_features, dim=0)
     return torch.cat((protein_features, mol_features), dim=1)

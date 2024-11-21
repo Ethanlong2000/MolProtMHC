@@ -68,6 +68,9 @@ class ProteinBertModel:
         sequences = df[column_name].tolist()
         return sequences
 
+    def parameters(self):
+        return self.model.parameters()
+
 # 示例用法
 if __name__ == "__main__": 
     model_path = "/home/longyh/software/prot_bert/"
