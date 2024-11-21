@@ -6,6 +6,8 @@ import logging
 import yaml
 import argparse
 import os
+import time  # 添加计时模块
+from datetime import datetime  # 添加日期时间模块
 from torch.utils.data import DataLoader, Dataset
 
 from prot import ProteinBertModel
@@ -46,6 +48,7 @@ def train_model(model, dataloader, criterion, optimizer, device, num_epochs=10, 
     patience_counter = 0
 
     for epoch in range(num_epochs):
+        start_time = time.time()  # 记录开始时间
         epoch_loss = 0.0
         for features, labels in dataloader:
             features, labels = features.to(device), labels.to(device).float()  # 转换标签为浮点数
@@ -58,7 +61,9 @@ def train_model(model, dataloader, criterion, optimizer, device, num_epochs=10, 
             epoch_loss += loss.item()
 
         epoch_loss /= len(dataloader)
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}")
+        end_time = time.time()  # 记录结束时间
+        epoch_duration = end_time - start_time  # 计算训练时间
+        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}, Duration: {epoch_duration:.2f} seconds")
 
         if epoch_loss < best_loss:
             best_loss = epoch_loss
@@ -97,7 +102,9 @@ def preprocess_data(csv_file, protein_col, smiles_col, label_col):
 # 保存模型
 def save_model(model, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torch.save(model.state_dict(), path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # 获取当前时间戳
+    model_path = f"{path}_{timestamp}.pt"  # 在模型名称上添加时间戳
+    torch.save(model.state_dict(), model_path)
 
 # 加载模型
 def load_model(model, path):

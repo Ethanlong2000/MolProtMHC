@@ -21,3 +21,8 @@
 2024-11-21 12:14:17,520 ERROR Error during training: Found dtype Long but expected Float
 2024-11-21 12:16:16,069 INFO Global seed set to 12345
 2024-11-21 12:16:16,621 INFO Global seed set to 12345
+2024-11-21 13:10:48,174 INFO Global seed set to 12345
+2024-11-21 13:10:48,726 INFO Global seed set to 12345
+2024-11-21 13:10:48,870 ERROR Error in data preprocessing: [Errno 2] No such file or directory: '/work/longyh/mhc/test12k.csv '
+2024-11-21 13:12:08,191 INFO Global seed set to 12345
+2024-11-21 13:12:08,744 INFO Global seed set to 12345
