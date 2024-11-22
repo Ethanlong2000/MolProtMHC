@@ -34,7 +34,7 @@ class MLPClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim1, hidden_dim2, hidden_dim3, output_dim):  # 增加一个隐藏层
         super(MLPClassifier, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim1)
-        self.bn1 = nn.BatchNorm1d(hidden_dim1)  # 添加批归一化层
+        self.bn1 = nn.BatchNorm1d(hidden_dim1)  # 添加批归一��层
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(0.5)  # 添加Dropout层
         self.fc2 = nn.Linear(hidden_dim1, hidden_dim2)
@@ -229,11 +229,11 @@ def main(config):
 
     classifier = MLPClassifier(config['input_dim'], config['hidden_dim1'], config['hidden_dim2'], config['hidden_dim3'], config['output_dim']).to(device)  # 修改初始化参数
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(classifier.parameters(), lr=float(config['learning_rate']))
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)  # 使用 ReduceLROnPlateau 调度器
+    optimizer = optim.Adam(classifier.parameters(), lr=float(config['learning_rate']), weight_decay=1e-5)  # 添加L2正则化
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)  # 调整patience参数
 
     try:
-        train_losses, val_losses = train_model(classifier, train_loader, val_loader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 5), scheduler=scheduler)
+        train_losses, val_losses = train_model(classifier, train_loader, val_loader, criterion, optimizer, device, num_epochs=config['num_epochs'], patience=config.get('patience', 10), scheduler=scheduler)  # 调整早停的耐心参数
         save_model(classifier, config['model_save_path'])
     except Exception as e:
         logging.error(f"Error during training: {e}")

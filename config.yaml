@@ -15,6 +15,7 @@ hidden_dim3: 64  # 新增隐藏层维度
 output_dim: 1
 learning_rate: 1e-4
 num_epochs: 50
+patience: 10  # 调整早停的耐心参数
 model_save_path: "./train_output/model.pth"
 log_file: "./train_output/training.log"
 feature_save_path: "/work/longyh/mhc/features.pkl"
