@@ -31,25 +31,37 @@ class CustomDataset(Dataset):
 
 # 多层感知机分类器
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dim1, hidden_dim2, output_dim):
+    def __init__(self, input_dim, hidden_dim1, hidden_dim2, hidden_dim3, output_dim):  # 增加一个隐藏层
         super(MLPClassifier, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim1)
         self.bn1 = nn.BatchNorm1d(hidden_dim1)  # 添加批归一化层
         self.relu1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(0.5)  # 添加Dropout层
         self.fc2 = nn.Linear(hidden_dim1, hidden_dim2)
         self.bn2 = nn.BatchNorm1d(hidden_dim2)  # 添加批归一化层
         self.relu2 = nn.ReLU()
-        self.fc3 = nn.Linear(hidden_dim2, output_dim)
+        self.dropout2 = nn.Dropout(0.5)  # 添加Dropout层
+        self.fc3 = nn.Linear(hidden_dim2, hidden_dim3)  # 新增隐藏层
+        self.bn3 = nn.BatchNorm1d(hidden_dim3)  # 新增批归一化层
+        self.relu3 = nn.ReLU()  # 新增激活函数
+        self.dropout3 = nn.Dropout(0.5)  # 添加Dropout层
+        self.fc4 = nn.Linear(hidden_dim3, output_dim)  # 修改输出层
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.bn1(x)  # 批归一化
         x = self.relu1(x)
+        x = self.dropout1(x)  # 应用Dropout
         x = self.fc2(x)
         x = self.bn2(x)  # 批归一化
         x = self.relu2(x)
-        x = self.fc3(x)
+        x = self.dropout2(x)  # 应用Dropout
+        x = self.fc3(x)  # 新增隐藏层
+        x = self.bn3(x)  # 新增批归一化层
+        x = self.relu3(x)  # 新增激活函数
+        x = self.dropout3(x)  # 应用Dropout
+        x = self.fc4(x)  # 修改输出层
         x = self.sigmoid(x)
         return x
 
@@ -215,7 +227,7 @@ def main(config):
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False)
 
-    classifier = MLPClassifier(config['input_dim'], config['hidden_dim1'], config['hidden_dim2'], config['output_dim']).to(device)
+    classifier = MLPClassifier(config['input_dim'], config['hidden_dim1'], config['hidden_dim2'], config['hidden_dim3'], config['output_dim']).to(device)  # 修改初始化参数
     criterion = nn.BCELoss()
     optimizer = optim.Adam(classifier.parameters(), lr=float(config['learning_rate']))
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)  # 使用 ReduceLROnPlateau 调度器
@@ -250,4 +262,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = load_config(args.config)
+    config['hidden_dim3'] = 64  # 新增隐藏层维度
     main(config)

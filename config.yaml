@@ -11,6 +11,7 @@ input_dim: 1792
 hidden_dim: 512
 hidden_dim1: 512
 hidden_dim2: 256
+hidden_dim3: 64  # 新增隐藏层维度
 output_dim: 1
 learning_rate: 1e-4
 num_epochs: 20
