@@ -16,3 +16,4 @@ learning_rate: 1e-4
 num_epochs: 20
 model_save_path: "./train_output/model.pth"
 log_file: "./train_output/training.log"
+feature_save_path: "/work/longyh/mhc/features.pkl"

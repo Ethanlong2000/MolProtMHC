@@ -194,8 +194,8 @@ def main(config):
                                                         config['smiles_col'], 
                                                         config['label_col'])
 
-    feature_path = config.get('feature_save_path', 'features.pkl')
-    if os.path.exists(feature_path):
+    feature_path = config.get('feature_save_path', 'features.pkl') 
+    if os.path.exists(feature_path): # 如果特征文件存在，则加载特征
         features = load_features(feature_path)
         print(f"Loaded features from {feature_path}")
     else:
