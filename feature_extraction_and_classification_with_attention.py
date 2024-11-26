@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,13 +7,13 @@ import logging
 import yaml
 import argparse
 import os
-import time  # 添加计时模块
-from datetime import datetime  # 添加日期时间模块
+import time
+from datetime import datetime
 from torch.utils.data import DataLoader, Dataset
-from sklearn.model_selection import train_test_split  # 添加数据集划分模块
-from torch.optim.lr_scheduler import ReduceLROnPlateau  # 添加学习率调度器
-import matplotlib.pyplot as plt  # 添加绘图模块
-import pickle  # 添加pickle模块
+from sklearn.model_selection import train_test_split
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import matplotlib.pyplot as plt
+import pickle
 
 from prot import ProteinBertModel
 from mol import MolFormer
@@ -29,39 +30,57 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]
 
+# 自注意力模块
+class SelfAttention(nn.Module):
+    def __init__(self, input_dim):
+        super(SelfAttention, self).__init__()
+        self.query = nn.Linear(input_dim, input_dim)
+        self.key = nn.Linear(input_dim, input_dim)
+        self.value = nn.Linear(input_dim, input_dim)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        Q = self.query(x)
+        K = self.key(x)
+        V = self.value(x)
+        attention_weights = self.softmax(torch.matmul(Q, K.transpose(-2, -1)) / (x.size(-1) ** 0.5))
+        return torch.matmul(attention_weights, V)
+
 # 多层感知机分类器
 class MLPClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dim1, hidden_dim2, hidden_dim3, output_dim):  # 增加一个隐藏层
+    def __init__(self, input_dim, hidden_dim1, hidden_dim2, hidden_dim3, output_dim):
         super(MLPClassifier, self).__init__()
+        self.attention = SelfAttention(input_dim)  # 添加自注意力模块
         self.fc1 = nn.Linear(input_dim, hidden_dim1)
-        self.bn1 = nn.BatchNorm1d(hidden_dim1)  # 添加批归一化层
+        self.bn1 = nn.BatchNorm1d(hidden_dim1)
         self.relu1 = nn.ReLU()
-        self.dropout1 = nn.Dropout(0.5)  # 添加Dropout层
+        self.dropout1 = nn.Dropout(0.5)
         self.fc2 = nn.Linear(hidden_dim1, hidden_dim2)
-        self.bn2 = nn.BatchNorm1d(hidden_dim2)  # 添加批归一化层
+        self.bn2 = nn.BatchNorm1d(hidden_dim2)
         self.relu2 = nn.ReLU()
-        self.dropout2 = nn.Dropout(0.5)  # 添加Dropout层
-        self.fc3 = nn.Linear(hidden_dim2, hidden_dim3)  # 新增隐藏层
-        self.bn3 = nn.BatchNorm1d(hidden_dim3)  # 新增批归一化层
-        self.relu3 = nn.ReLU()  # 新增激活函数
-        self.dropout3 = nn.Dropout(0.5)  # 添加Dropout层
-        self.fc4 = nn.Linear(hidden_dim3, output_dim)  # 修改输出层
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(hidden_dim2, hidden_dim3)
+        self.bn3 = nn.BatchNorm1d(hidden_dim3)
+        self.relu3 = nn.ReLU()
+        self.dropout3 = nn.Dropout(0.5)
+        self.fc4 = nn.Linear(hidden_dim3, output_dim)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        x = self.attention(x)  # 应用自注意力模块
         x = self.fc1(x)
-        x = self.bn1(x)  # 批归一化
+        x = self.bn1(x)
         x = self.relu1(x)
-        x = self.dropout1(x)  # 应用Dropout
+        x = self.dropout1(x)
         x = self.fc2(x)
-        x = self.bn2(x)  # 批归一化
+        x = self.bn2(x)
         x = self.relu2(x)
-        x = self.dropout2(x)  # 应用Dropout
-        x = self.fc3(x)  # 新增隐藏层
-        x = self.bn3(x)  # 新增批归一化层
-        x = self.relu3(x)  # 新增激活函数
-        x = self.dropout3(x)  # 应用Dropout
-        x = self.fc4(x)  # 修改输出层
+        x = self.dropout2(x)
+        x = self.fc3(x)
+        x = self.bn3(x)
+        x = self.relu3(x)
+        x = self.dropout3(x)
+        x = self.fc4(x)
         x = self.sigmoid(x)
         return x
 
@@ -257,10 +276,10 @@ def main(config):
     print(f"Total script duration: {total_duration:.2f} seconds")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Feature Extraction and Classification')
+    parser = argparse.ArgumentParser(description='Feature Extraction and Classification with Attention')
     parser.add_argument('--config', type=str, required=True, help='Path to the config file')
     args = parser.parse_args()
 
     config = load_config(args.config)
-    config['hidden_dim3'] = 64  # 新增隐藏层维度
+    config['hidden_dim3'] = 64
     main(config)
