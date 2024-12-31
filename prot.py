@@ -2,6 +2,10 @@ from transformers import BertModel, BertTokenizer
 import torch
 import re
 import pandas as pd
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
+
 
 class ProteinBertModel:
     def __init__(self, model_path, device=None):
@@ -40,33 +44,12 @@ class ProteinBertModel:
         pooler_output = output['pooler_output']
         return pooler_output.detach()
     
-    def fine_tune(self, train_dataloader, num_epochs=3, learning_rate=1e-5):
-        self.model.train()
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
-        
-        for epoch in range(num_epochs):
-            for batch in train_dataloader:
-                inputs = batch['input_ids'].to(self.device)
-                labels = batch['labels'].to(self.device)
-                
-                optimizer.zero_grad()
-                
-                outputs = self.model(inputs)
-                pooled_output = outputs['pooler_output']
-                
-                # 假设有一个分类层
-                logits = self.classifier(pooled_output)
-                
-                loss = torch.nn.CrossEntropyLoss()(logits, labels)
-                loss.backward()
-                optimizer.step()
-                
-                print(f"Epoch {epoch + 1}, Loss: {loss.item()}")
+    def peptide_to_smiles(peptide_sequence):
+        mol = AllChem.MolFromSequence(peptide_sequence)
+        return Chem.MolToSmiles(mol)
 
-    def process_csv(self, csv_file, column_name):
-        df = pd.read_csv(csv_file)
-        sequences = df[column_name].tolist()
-        return sequences
+    def canonicalize(s):    
+        return Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, isomericSmiles=False)
 
     def parameters(self):
         return self.model.parameters()

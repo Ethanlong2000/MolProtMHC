@@ -61,24 +61,24 @@ vocab_path = './Data/mol/bert_vocab.txt'
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Selected device: {device}")
+print(f"Selected device: {device}") 
 
 molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
 
 
-#调用模型用下面的代码
-# df = process_csv.process_csv_file(datapath)
-# smiles = df.smiles.apply(process_csv.canonicalize)
+# 调用模型用下面的代码
+df = process_csv.process_csv_file(datapath)
+smiles = df.smiles.apply(process_csv.canonicalize)
 
-#训练模型时省略处理smiles的步骤(csv文件中已经处理好)
-# df=pd.read_csv(datapath)
-# smiles = df.canonical_smiles
+# 训练模型时省略处理smiles的步骤(csv文件中已经处理好)
+df=pd.read_csv(datapath)
+smiles = df.canonical_smiles
 
-# start_time = time.time()
-# X = molformer.embed(smiles).cpu().numpy()
-# end_time = time.time()
-# input("ENTER...")  # ���加输入提示
-# print(f"Embedding time: {end_time - start_time} seconds")
-# print(X.shape)
+start_time = time.time()
+X = molformer.embed(smiles).cpu().numpy()
+end_time = time.time()
+input("ENTER...")  # ���加输入提示
+print(f"Embedding time: {end_time - start_time} seconds")
+print(X.shape)
 
 
