@@ -1,6 +1,6 @@
 import yaml
 import torch
-import time
+
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -44,41 +44,41 @@ class MolFormer:
             embeddings.append(embedding.detach())
         return torch.cat(embeddings)
 
-    def canonicalize(self, s):
-        return Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, isomericSmiles=False)
+    # def canonicalize(self, s):
+    #     return Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, isomericSmiles=False)
 
-    def peptide_to_smiles(self, peptide_sequence):
-        mol = AllChem.MolFromSequence(peptide_sequence)
-        return Chem.MolToSmiles(mol)
+    # def peptide_to_smiles(self, peptide_sequence):
+    #     mol = AllChem.MolFromSequence(peptide_sequence)
+    #     return Chem.MolToSmiles(mol)
 
-    def parameters(self):
-        return self.lm.parameters()
+    # def parameters(self):
+    #     return self.lm.parameters()
 
 datapath='./Data/test1k.csv'
 config_path = './Data/mol/hparams.yaml'
 ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
 vocab_path = './Data/mol/bert_vocab.txt'
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Selected device: {device}") 
+# device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# print(f"CUDA available: {torch.cuda.is_available()}")
+# print(f"Selected device: {device}") 
 
-molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
+# molformer = MolFormer(config_path, ckpt_path, vocab_path, device=device)
 
 
-# 调用模型用下面的代码
-df = process_csv.process_csv_file(datapath)
-smiles = df.smiles.apply(process_csv.canonicalize)
+# # 调用模型用下面的代码
+# df = process_csv.process_csv_file(datapath)
+# smiles = df.smiles.apply(process_csv.canonicalize)
 
-# 训练模型时省略处理smiles的步骤(csv文件中已经处理好)
-df=pd.read_csv(datapath)
-smiles = df.canonical_smiles
+# # 训练模型时省略处理smiles的步骤(csv文件中已经处理好)
+# df=pd.read_csv(datapath)
+# smiles = df.canonical_smiles
 
-start_time = time.time()
-X = molformer.embed(smiles).cpu().numpy()
-end_time = time.time()
-input("ENTER...")  # ���加输入提示
-print(f"Embedding time: {end_time - start_time} seconds")
-print(X.shape)
+# start_time = time.time()
+# X = molformer.embed(smiles).cpu().numpy()
+# end_time = time.time()
+# input("ENTER...")  # ���加输入提示
+# print(f"Embedding time: {end_time - start_time} seconds")
+# print(X.shape)
 
 
