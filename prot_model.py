@@ -1,242 +1,177 @@
-import pandas as pd
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import logging
-import yaml
-import argparse
-import os
-import time
-from transformers import BertModel, BertTokenizer
-import re
-import matplotlib.pyplot as plt
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from prot import ProteinBertModel
 
-
-class ProteinBertModel:
-    def __init__(self, model_path, device=None):
+class MHCPeptideModel(nn.Module):
+    def __init__(
+        self,
+        bert_model_path,
+        hidden_dim=1024,
+        gru_hidden_dim=512,
+        num_gru_layers=2,
+        dropout_rate=0.3,
+        freeze_bert=True,
+        device=None,
+        max_length=49
+    ):
+        super().__init__()
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = BertTokenizer.from_pretrained(model_path, do_lower_case=False)
-        self.model = BertModel.from_pretrained(model_path).to(self.device)
-    
-    def preprocess_sequence(self, peptide, HLA_sequence, max_length=51):
-        sequence = f"{self.tokenizer.cls_token}{peptide}{self.tokenizer.sep_token}{HLA_sequence}"
-        encoded_input = self.tokenizer(sequence, return_tensors='pt', padding='max_length', truncation=True, max_length=max_length).to(self.device)
-        return encoded_input
-    
-    def preprocess_sequences(self, peptides, HLA_sequences, batch_size=64, max_length=51):
-        all_input_ids = []
-        all_attention_masks = []
+        self.max_length = max_length
+        self.gru_hidden_dim = gru_hidden_dim
         
-        for i in range(0, len(peptides), batch_size):
-            batch_peptides = peptides[i:i + batch_size]
-            batch_HLA_sequences = HLA_sequences[i:i + batch_size]
-            batch_sequences = [f"{self.tokenizer.cls_token}{pep}{self.tokenizer.sep_token}{hla}" for pep, hla in zip(batch_peptides, batch_HLA_sequences)]
-            encoded_inputs = self.tokenizer(batch_sequences, return_tensors='pt', padding='max_length', truncation=True, max_length=max_length).to(self.device)
-            all_input_ids.append(encoded_inputs['input_ids'])
-            all_attention_masks.append(encoded_inputs['attention_mask'])
+        # ProtBERT特征提取器
+        self.bert_model = ProteinBertModel(bert_model_path, device=self.device)
+        self.freeze_bert = freeze_bert
+        self.set_bert_training_mode(not freeze_bert)
         
-        input_ids = torch.cat(all_input_ids, dim=0)
-        attention_mask = torch.cat(all_attention_masks, dim=0)
-        return {'input_ids': input_ids, 'attention_mask': attention_mask}
+        # 添加BERT输出的BN层
+        self.bert_bn = nn.BatchNorm1d(hidden_dim)
+        
+        # BiGRU层
+        self.mhc_gru = nn.GRU(
+            input_size=hidden_dim,
+            hidden_size=gru_hidden_dim,
+            num_layers=num_gru_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout_rate if num_gru_layers > 1 else 0
+        )
+        
+        # GRU输出的BN层
+        self.gru_bn = nn.BatchNorm1d(gru_hidden_dim * 2)
+        
+        # 特征融合和分类层
+        combined_dim = gru_hidden_dim * 2
+        self.classifier = nn.Sequential(
+            nn.Linear(combined_dim, combined_dim // 2),
+            nn.BatchNorm1d(combined_dim // 2),  # 添加BN
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(combined_dim // 2, combined_dim // 4),
+            nn.BatchNorm1d(combined_dim // 4),  # 添加BN
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(combined_dim // 4, 1),
+            nn.Sigmoid()
+        )
 
-    def get_last_hidden_state(self, sequences):
-        encoded_inputs = self.preprocess_sequences(sequences)
-        output = self.model(**encoded_inputs)
-        last_hidden_state = output['last_hidden_state']
-        return last_hidden_state.detach()
-    
-    def get_pooler_output(self, sequences):
-        encoded_inputs = self.preprocess_sequences(sequences)
-        output = self.model(**encoded_inputs)
-        pooler_output = output['pooler_output']
-        return pooler_output.detach()
-    
-    def parameters(self):
-        return self.model.parameters()
+    def combine_sequences(self, mhc_seq, peptide_seq):
+        """将MHC和peptide序列组合，并添加填充"""
+        combined = mhc_seq + peptide_seq
+        # 使用X进行填充到指定长度
+        padded = combined + 'X' * (self.max_length - len(combined))
+        # 不需要手动添加[CLS]和[SEP]，让tokenizer来处理
+        return padded
 
-class ProteinBertBiGRUClassifier(nn.Module):
-    def __init__(self, model_path, hidden_dim, output_dim, n_layers, bidirectional, dropout, device=None):
-        super(ProteinBertBiGRUClassifier, self).__init__()
-        self.bert_model = ProteinBertModel(model_path, device)
-        self.gru = nn.GRU(self.bert_model.model.config.hidden_size, hidden_dim, num_layers=n_layers, bidirectional=bidirectional, batch_first=True)
-        self.fc = nn.Linear(hidden_dim * 2 if bidirectional else hidden_dim, output_dim)
-        self.dropout = nn.Dropout(dropout)
-    
-    def forward(self, peptides, HLA_sequences):
-        encoded_inputs = self.bert_model.preprocess_sequences(peptides, HLA_sequences)
-        with torch.no_grad():
-            bert_outputs = self.bert_model.model(**encoded_inputs)
-        hidden_states = bert_outputs.last_hidden_state
-        gru_output, _ = self.gru(hidden_states)
-        pooled_output = torch.cat((gru_output[:, -1, :self.gru.hidden_size], gru_output[:, 0, self.gru.hidden_size:]), dim=1)
-        output = self.fc(self.dropout(pooled_output))
+    def forward(self, mhc_sequences, peptide_sequences):
+        # 组合序列
+        combined_sequences = [
+            self.combine_sequences(mhc, pep) 
+            for mhc, pep in zip(mhc_sequences, peptide_sequences)
+        ]
+        
+        # 获取BERT特征
+        features = self.bert_model.get_last_hidden_state(combined_sequences)
+        
+        # 对BERT特征进行BN（需要调整维度）
+        batch_size, seq_len, hidden_dim = features.shape
+        features = features.reshape(-1, hidden_dim)
+        features = self.bert_bn(features)
+        features = features.reshape(batch_size, seq_len, hidden_dim)
+        
+        # BiGRU特征提取
+        gru_out, _ = self.mhc_gru(features)
+        
+        # 获取最后一个时间步的隐藏状态
+        final_features = torch.cat([
+            gru_out[:, -1, :self.gru_hidden_dim],
+            gru_out[:, 0, self.gru_hidden_dim:]
+        ], dim=1)
+        
+        # 对GRU输出进行BN
+        final_features = self.gru_bn(final_features)
+        
+        # 分类预测
+        output = self.classifier(final_features)
         return output
 
-class EarlyStopping:
-    def __init__(self, patience=5, verbose=False, delta=0):
-        self.patience = patience
-        self.verbose = verbose
-        self.counter = 0
-        self.best_score = None
-        self.early_stop = False
-        self.val_loss_min = np.Inf
-        self.delta = delta
-        self.best_model_params = None
-
-    def __call__(self, val_loss, model):
-        score = -val_loss
-
-        if self.best_score is None:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-        elif score < self.best_score + self.delta:
-            self.counter += 1
-            if self.verbose:
-                print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience:
-                self.early_stop = True
+    def set_bert_training_mode(self, trainable=True):
+        """设置BERT层是否可训练"""
+        for param in self.bert_model.parameters():
+            param.requires_grad = trainable
+        self.freeze_bert = not trainable
+    
+    def get_trainable_params(self):
+        """获取需要训练的参数"""
+        if self.freeze_bert:
+            # 如果BERT被冻结，只返回其他层的参数
+            return [p for n, p in self.named_parameters() if not n.startswith('bert_model')]
         else:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-            self.counter = 0
+            # 如果BERT未被冻结，返回所有参数
+            return self.parameters()
 
-    def save_checkpoint(self, val_loss, model):
-        if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        self.best_model_params = model.state_dict()
-        self.val_loss_min = val_loss
-
-    def load_best_model(self, model):
-        if self.best_model_params:
-            model.load_state_dict(self.best_model_params)
-
-class Trainer:
-    def __init__(self, model, train_set, val_set, epochs=10, batch_size=512, learning_rate=1e-5, device=None):
-        self.model = model
-        self.train_set = train_set
-        self.val_set = val_set
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
+class MHCPeptideTrainer:
+    def __init__(
+        self,
+        model,
+        learning_rate=1e-4,
+        weight_decay=1e-5,
+        device=None
+    ):
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
-        self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=3, factor=0.5, verbose=True)
-        self.train_losses = []
-        self.val_losses = []
-        self.val_accuracies = []
+        self.model = model.to(self.device)
+        self.criterion = nn.BCELoss()
+        self.optimizer = torch.optim.AdamW(
+            self.model.get_trainable_params(),
+            lr=learning_rate,
+            weight_decay=weight_decay
+        )
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer,
+            T_max=10,
+            eta_min=1e-6
+        )
     
-    def load_data(self, file_path):
-        data = pd.read_csv(file_path)
-        peptides = data['peptide'].tolist()
-        HLA_sequences = data['HLA_sequence'].tolist()
-        labels = data['label'].tolist()
-        return peptides, HLA_sequences, labels
+    def train_step(self, mhc_sequences, peptide_sequences, labels):
+        self.model.train()
+        self.optimizer.zero_grad()
+        
+        # 确保标签数据在正确的设备上
+        labels = labels.to(self.device)
+        
+        outputs = self.model(mhc_sequences, peptide_sequences)
+        loss = self.criterion(outputs, labels)
+        
+        loss.backward()
+        self.optimizer.step()
+        
+        return loss.item()
     
-    def plot_metrics(self):
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        plt.figure(figsize=(10, 5))
-        
-        plt.subplot(1, 2, 1)
-        plt.plot(self.train_losses, label='Train Loss')
-        plt.plot(self.val_losses, label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.title('Loss over Epochs')
-        
-        plt.subplot(1, 2, 2)
-        plt.plot(self.val_accuracies, label='Validation Accuracy')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.title('Accuracy over Epochs')
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f"training_metrics_{timestamp}.png"))
-        plt.close()
-    
-    def save_model(self):
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        model_path = os.path.join(output_dir, f"model_{timestamp}.pt")
-        torch.save(self.model.state_dict(), model_path)
-        print(f"Model saved to {model_path}")
-    
-    def train(self):
-        train_peptides, train_HLA_sequences, train_labels = self.load_data(self.train_set)
-        val_peptides, val_HLA_sequences, val_labels = self.load_data(self.val_set)
-        
-        for epoch in range(self.epochs):
-            self.model.train()
-            total_loss = 0
-            for i in range(0, len(train_peptides), self.batch_size):
-                batch_peptides = train_peptides[i:i + self.batch_size]
-                batch_HLA_sequences = train_HLA_sequences[i:i + self.batch_size]
-                batch_labels = torch.tensor(train_labels[i:i + self.batch_size], dtype=torch.long).to(self.device)
-                
-                self.optimizer.zero_grad()
-                outputs = self.model(batch_peptides, batch_HLA_sequences)
-                loss = self.criterion(outputs, batch_labels)
-                loss.backward()
-                self.optimizer.step()
-                
-                total_loss += loss.item()
+    def evaluate(self, mhc_sequences, peptide_sequences, labels):
+        self.model.eval()
+        with torch.no_grad():
+            # 确保标签数据在正确的设备上
+            labels = labels.to(self.device)
             
-            avg_train_loss = total_loss / len(train_peptides)
-            self.train_losses.append(avg_train_loss)
-            
-            self.model.eval()
-            total_val_loss = 0
-            correct = 0
-            with torch.no_grad():
-                for i in range(0, len(val_peptides), self.batch_size):
-                    batch_peptides = val_peptides[i:i + self.batch_size]
-                    batch_HLA_sequences = val_HLA_sequences[i:i + self.batch_size]
-                    batch_labels = torch.tensor(val_labels[i:i + self.batch_size], dtype=torch.long).to(self.device)
-                    
-                    outputs = self.model(batch_peptides, batch_HLA_sequences)
-                    loss = self.criterion(outputs, batch_labels)
-                    total_val_loss += loss.item()
-                    
-                    preds = torch.argmax(outputs, dim=1)
-                    correct += (preds == batch_labels).sum().item()
-            
-            avg_val_loss = total_val_loss / len(val_peptides)
-            val_accuracy = correct / len(val_peptides)
-            self.val_losses.append(avg_val_loss)
-            self.val_accuracies.append(val_accuracy)
-            
-            self.scheduler.step(avg_val_loss)
-            current_lr = self.optimizer.param_groups[0]['lr']
-            print(f"Current learning rate: {current_lr}")
-            
-            print(f"Epoch {epoch + 1}/{self.epochs}")
-            print(f"Train Loss: {avg_train_loss:.4f}")
-            print(f"Validation Loss: {avg_val_loss:.4f}")
-            print(f"Validation Accuracy: {val_accuracy:.4f}")
+            outputs = self.model(mhc_sequences, peptide_sequences)
+            loss = self.criterion(outputs, labels)
+            predictions = (outputs > 0.5).float()
+            accuracy = (predictions == labels).float().mean()
         
-        self.plot_metrics()
-        self.save_model()
+        return loss.item(), accuracy.item()
 
-
-model_path = "/home/longyh/software/prot_bert/"
-
-train_set='/work/longyh/MolProtMHC/Data/train100k.csv'
-val_set='/work/longyh/MolProtMHC/Data/val100k.csv'
-
-output_dir = "/work/longyh/MolProtMHC/train_output/prot_output"
-
-if __name__=='__main__':
-    #当前时间
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    # Example usage:
-    classifier = ProteinBertBiGRUClassifier(model_path, hidden_dim=256, output_dim=2, n_layers=2, bidirectional=True, dropout=0.5)
-    trainer = Trainer(classifier, train_set, val_set, epochs=20, batch_size=64, learning_rate=1e-4)
-    trainer.train()
-    #结束时间
-    timestamp2 = time.strftime("%Y%m%d-%H%M%S")
-    #耗费时间
-    print('time:', time.mktime(time.strptime(timestamp2)) - time.mktime(time.strptime(timestamp)))
+    def unfreeze_bert(self, learning_rate=1e-5):
+        """解冻BERT层并重新初始化优化器"""
+        self.model.set_bert_training_mode(True)
+        # 为BERT层使用较小的学习率
+        bert_params = {'params': self.model.bert_model.parameters(), 'lr': learning_rate}
+        other_params = {'params': [p for n, p in self.model.named_parameters() 
+                                 if not n.startswith('bert_model')]}
+        self.optimizer = torch.optim.AdamW([bert_params, other_params])
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer,
+            T_max=10,
+            eta_min=1e-6
+        )

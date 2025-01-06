@@ -24,7 +24,15 @@ class ProteinBertModel:
         
         for i in range(0, len(sequences), batch_size):
             batch_sequences = sequences[i:i + batch_size]
-            encoded_inputs = self.tokenizer(batch_sequences, return_tensors='pt', padding=True, truncation=True).to(self.device)
+            # 设置add_special_tokens=True让tokenizer自动添加[CLS]和[SEP]
+            encoded_inputs = self.tokenizer(
+                batch_sequences,
+                return_tensors='pt',
+                padding=True,
+                truncation=True,
+                max_length=512,
+                add_special_tokens=True  # 自动添加[CLS]和[SEP]
+            ).to(self.device)
             all_input_ids.append(encoded_inputs['input_ids'])
             all_attention_masks.append(encoded_inputs['attention_mask'])
         
@@ -58,7 +66,7 @@ class ProteinBertModel:
 if __name__ == "__main__": 
     model_path = "/home/longyh/software/prot_bert/"
     csv_file = "/work/longyh/MolProtMHC/Data/test1k.csv"
-    column_name = "combine"
+
     
     protein_bert_model = ProteinBertModel(model_path)
     sequences = protein_bert_model.process_csv(csv_file, column_name)
