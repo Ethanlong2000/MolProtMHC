@@ -54,7 +54,7 @@ class ProteinBertModel:
     def parameters(self):
         return self.model.parameters()
 
-# 示例用法
+# 
 if __name__ == "__main__": 
     model_path = "/home/longyh/software/prot_bert/"
     csv_file = "/work/longyh/MolProtMHC/Data/test1k.csv"

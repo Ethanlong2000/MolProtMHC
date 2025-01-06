@@ -1,5 +1,6 @@
 import yaml
 import torch
+from tqdm import tqdm  # 添加进度条库
 
 import pandas as pd
 from rdkit import Chem
@@ -27,11 +28,11 @@ class MolFormer:
         while i < len(data):
             yield data[i:min(i+batch_size, len(data))]
             i += batch_size
-
     def embed(self, smiles, batch_size=64):
         self.lm.eval()
         embeddings = []
-        for batch in self.batch_split(smiles, batch_size=batch_size):
+        # 使用tqdm包裹batch_split生成器以显示进度条
+        for batch in tqdm(self.batch_split(smiles, batch_size=batch_size), total=(len(smiles) + batch_size - 1) // batch_size, desc="Embedding batches"):
             batch_enc = self.tokenizer.batch_encode_plus(batch, padding=True, add_special_tokens=True)
             idx, mask = torch.tensor(batch_enc['input_ids']).to(self.device), torch.tensor(batch_enc['attention_mask']).to(self.device)
             with torch.no_grad():
@@ -43,6 +44,22 @@ class MolFormer:
             embedding = sum_embeddings / sum_mask
             embeddings.append(embedding.detach())
         return torch.cat(embeddings)
+    
+    # def embed(self, smiles, batch_size=64):
+    #     self.lm.eval()
+    #     embeddings = []
+    #     for batch in self.batch_split(smiles, batch_size=batch_size):
+    #         batch_enc = self.tokenizer.batch_encode_plus(batch, padding=True, add_special_tokens=True)
+    #         idx, mask = torch.tensor(batch_enc['input_ids']).to(self.device), torch.tensor(batch_enc['attention_mask']).to(self.device)
+    #         with torch.no_grad():
+    #             token_embeddings = self.lm.blocks(self.lm.tok_emb(idx), length_mask=LM(mask.sum(-1)))
+    #         # average pooling over tokens
+    #         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    #         sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+    #         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+    #         embedding = sum_embeddings / sum_mask
+    #         embeddings.append(embedding.detach())
+    #     return torch.cat(embeddings)
 
     # def canonicalize(self, s):
     #     return Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, isomericSmiles=False)
@@ -54,10 +71,10 @@ class MolFormer:
     # def parameters(self):
     #     return self.lm.parameters()
 
-datapath='./Data/test1k.csv'
-config_path = './Data/mol/hparams.yaml'
-ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
-vocab_path = './Data/mol/bert_vocab.txt'
+# datapath='./Data/test1k.csv'
+# config_path = './Data/mol/hparams.yaml'
+# ckpt_path = '/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt'
+# vocab_path = './Data/mol/bert_vocab.txt'
 
 # device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # print(f"CUDA available: {torch.cuda.is_available()}")
