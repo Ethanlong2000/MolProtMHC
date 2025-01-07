@@ -10,7 +10,6 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     confusion_matrix, average_precision_score
 )
-import seaborn as sns
 from prot_model import MHCPeptideModel
 from prot_model_train import MHCPeptideDataset
 import logging
@@ -32,9 +31,19 @@ class ModelEvaluator:
         self.test_data_path = test_data_path
         self.batch_size = batch_size
         
-        # 创建输出目录
+        # 从模型路径中提取模型信息
+        model_name = os.path.basename(model_path)
+        model_date = model_name.split('_')[2] if '_' in model_name else 'unknown'
+        
+        # 从测试数据路径中提取数据集信息
+        test_set_name = os.path.basename(test_data_path).split('.')[0]
+        
+        # 创建更具描述性的输出目录名
         self.timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.output_dir = os.path.join(output_dir, f'evaluation_{self.timestamp}')
+        self.output_dir = os.path.join(
+            output_dir,
+            f'eval_{test_set_name}_model{model_date}_{self.timestamp}'
+        )
         os.makedirs(self.output_dir, exist_ok=True)
         
         # 设置日志
@@ -74,6 +83,11 @@ class ModelEvaluator:
             test_df['peptide'].values,
             test_df['label'].values
         )
+        # test_dataset = MHCPeptideDataset(
+        # test_df['mhc_sequence'].values,
+        # test_df['sequence'].values,
+        # test_df['binding300'].values
+        # )
         self.test_loader = DataLoader(
             test_dataset,
             batch_size=self.batch_size,
@@ -126,8 +140,7 @@ class ModelEvaluator:
             'auc_roc': roc_curve(self.labels, self.preds),
             'auc_score': auc(*roc_curve(self.labels, self.preds)[:2]),
             'precision_recall': precision_recall_curve(self.labels, self.preds),
-            'auc_pr': average_precision_score(self.labels, self.preds),
-            'confusion_matrix': confusion_matrix(self.labels, pred_labels)
+            'auc_pr': average_precision_score(self.labels, self.preds)
         }
         
     def _plot_curves(self):
@@ -141,10 +154,13 @@ class ModelEvaluator:
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title('Receiver Operating Characteristic')
+        plt.title(f'ROC Curve - {os.path.basename(self.test_data_path)}')
         plt.legend(loc="lower right")
         plt.grid(True)
-        plt.savefig(os.path.join(self.output_dir, 'roc_curve.png'))
+        plt.savefig(os.path.join(
+            self.output_dir, 
+            f'roc_curve_{os.path.basename(self.test_data_path)}_{self.timestamp}.png'
+        ))
         plt.close()
         
         # PR曲线
@@ -153,24 +169,13 @@ class ModelEvaluator:
         plt.plot(recall, precision, label=f'PR curve (AP = {self.metrics["auc_pr"]:.3f})')
         plt.xlabel('Recall')
         plt.ylabel('Precision')
-        plt.title('Precision-Recall Curve')
+        plt.title(f'PR Curve - {os.path.basename(self.test_data_path)}')
         plt.legend(loc="lower left")
         plt.grid(True)
-        plt.savefig(os.path.join(self.output_dir, 'pr_curve.png'))
-        plt.close()
-        
-        # 混淆矩阵
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(
-            self.metrics['confusion_matrix'],
-            annot=True,
-            fmt='d',
-            cmap='Blues',
-            xticklabels=['Negative', 'Positive'],
-            yticklabels=['Negative', 'Positive']
-        )
-        plt.title('Confusion Matrix')
-        plt.savefig(os.path.join(self.output_dir, 'confusion_matrix.png'))
+        plt.savefig(os.path.join(
+            self.output_dir, 
+            f'pr_curve_{os.path.basename(self.test_data_path)}_{self.timestamp}.png'
+        ))
         plt.close()
         
     def _generate_report(self):
@@ -180,20 +185,23 @@ class ModelEvaluator:
             "=====================\n\n"
             f"Evaluation Time: {self.timestamp}\n"
             f"Model Path: {self.model_path}\n"
-            f"Test Data Path: {self.test_data_path}\n\n"
+            f"Model Date: {os.path.basename(self.model_path).split('_')[2]}\n"
+            f"Test Data: {self.test_data_path}\n"
+            f"Test Set Name: {os.path.basename(self.test_data_path).split('.')[0]}\n\n"
             "Metrics:\n"
             f"- Accuracy: {self.metrics['accuracy']:.4f}\n"
             f"- Precision: {self.metrics['precision']:.4f}\n"
             f"- Recall: {self.metrics['recall']:.4f}\n"
             f"- F1 Score: {self.metrics['f1']:.4f}\n"
             f"- ROC AUC: {self.metrics['auc_score']:.4f}\n"
-            f"- PR AUC: {self.metrics['auc_pr']:.4f}\n\n"
-            "Confusion Matrix:\n"
-            f"{self.metrics['confusion_matrix']}\n"
+            f"- PR AUC: {self.metrics['auc_pr']:.4f}\n"
         )
         
-        # 保存报告
-        with open(os.path.join(self.output_dir, 'evaluation_report.txt'), 'w') as f:
+        # 保存报告时使用更具描述性的文件名
+        report_filename = f'evaluation_report_{os.path.basename(self.test_data_path)}_{self.timestamp}.txt'
+        report_path = os.path.join(self.output_dir, report_filename)
+        
+        with open(report_path, 'w') as f:
             f.write(report)
         
         # 同时输出到日志
@@ -206,11 +214,13 @@ def main(config):
 if __name__ == '__main__':
     # 评估配置示例
     config = {
-        'model_path': '',  # 需要填写训练好的模型路径
+        'model_path': '/work/longyh/mhc/train_output/prot_output/run_20250107_133441/best_model_20250107_133441.pth',  # 需要填写训练好的模型路径
         'bert_model_path': '/home/longyh/software/prot_bert/',
-        'test_data_path': '',  # 需要填写测试集路径
+        
+        'test_data_path': '/work/longyh/mhc/Data/val_data_fold2.csv',  # 需要填写测试集路径
+        
         'output_dir': '/work/longyh/mhc/evaluation_output',
-        'batch_size': 256
+        'batch_size': 2048
     }
     
     main(config)
