@@ -267,13 +267,13 @@ def train_model(
 if __name__ == '__main__':
     # 训练参数
     config = {
-        'train_data_path': '/work/longyh/mhc/Data/train_data_fold0.csv',
-        'val_data_path': '/work/longyh/mhc/Data/val_data_fold0.csv',
+        'train_data_path': '/work/longyh/mhc/Data/train100k_0.csv',
+        'val_data_path': '/work/longyh/mhc/Data/val100k_0.csv',
         'bert_model_path': '/home/longyh/software/prot_bert/',
         'output_dir': '/work/longyh/mhc/train_output/prot_output',
         'epochs': 50,
-        'batch_size': 1024,
-        'learning_rate': 1e-4,
+        'batch_size': 512,
+        'learning_rate': 2e-4,
         'weight_decay': 1e-5,
         'seed': 42
     }
