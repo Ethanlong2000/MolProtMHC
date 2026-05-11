@@ -1,8 +1,8 @@
-protein_model_path: "/home/longyh/software/prot_bert/"
+protein_model_path: "/software/prot_bert/"
 mol_config_path: "./Data/mol/hparams.yaml"
-mol_ckpt_path: "/home/longyh/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt"
+mol_ckpt_path: "/database/molformer/PretrainedMoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt"
 mol_vocab_path: "./Data/mol/bert_vocab.txt"
-csv_file: "/work/longyh/mhc/test125k.csv"
+csv_file: "/mhc/test125k.csv"
 protein_col: "combine"
 smiles_col: "canonical_smiles"
 label_col: "binding300"
@@ -12,16 +12,15 @@ feature_type: "protein"
 # feature_type: "both"
 
 batch_size: 128
-# input_dim: 1792
+
 hidden_dim: 512
 hidden_dim1: 256
 hidden_dim2: 64
-# hidden_dim3: 64  # 新增隐藏层维度
+
 output_dim: 1
 learning_rate: 1e-4
 num_epochs: 50
-patience: 10  # 调整早停的耐心参数
-
+patience: 10  
 
 model_save_path: "./train_output/model.pth"
 log_file: "./train_output/training.log"
